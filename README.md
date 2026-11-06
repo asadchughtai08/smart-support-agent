@@ -68,7 +68,7 @@ smart-support-agent/
 ### 1. Clone the Repository
 
 ```bash
-git clone YOUR_REPOSITORY_URL
+git clone https://github.com/asadchughtai08/smart-support-agent.git
 ```
 
 ### 2. Navigate to the Project
