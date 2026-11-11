@@ -36,7 +36,7 @@ orders = {  # fake order data
 
 
 def extract_order_id(query):  # query mein se 4 digit order ID nikalta hai
-    match = re.search(r"\b\d{4}\b", query)  # 4 digit ka number dhoondo
+    match =re.search(r"(?<!\d)\d{4}(?!\d)", query)  # 4 digit ka number dhoondo
     if match:  # agar mil gaya
         return match.group()  # number wapas do
     else:  # agar nahi mila
