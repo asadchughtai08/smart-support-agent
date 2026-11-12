@@ -19,7 +19,8 @@ from langchain_core.messages import SystemMessage, HumanMessage, ToolMessage  # 
 load_dotenv()  # .env file ki API key load karo
 
 llm = ChatGoogleGenerativeAI(  # Gemini model bana rahe hain
-    model="gemini-3.5-flash-lite",  # model ka naam
+    model="gemini-3.5-flash-lite",  # model ka 
+    
     google_api_key=os.getenv("GEMINI_API_KEY"),  # .env se API key lo
 )
 

@@ -1,185 +1,145 @@
-# 🤖 Smart Support Agent
+# Smart Support Agent
 
-An AI-powered customer support application built using Python and Google's Gemini API. This project demonstrates basic Agentic AI design patterns, including Prompt Chaining, Intent Extraction, Routing, Tool Use, and Reflection.
+A small customer support agent built with Python and Google Gemini.
+It reads a customer query, finds the intent, routes the request to the right agent, uses tools to get real order data, and reviews its own answer before replying.
 
-## 🚀 Project Overview
+The same idea is built **four ways**, so you can compare a plain workflow with a real tool-calling agent.
 
-The Smart Support Agent receives customer queries, identifies their intent, selects the appropriate support agent, and generates a helpful response.
+## Versions
 
-For order tracking queries, the application uses a simple Python tool to retrieve order status from sample order data.
+| Version | File | Who decides the path? |
+|---|---|---|
+| 1. Original (Gemini SDK) | `main.py` | Code (`if/elif` routing) |
+| 2. LangChain routing | `langchain_version/main_branch.py` | Code (`RunnableBranch`), fixed workflow |
+| 3. LangChain tools | `langchain_version/main_tools.py` | The LLM chooses tools itself (real agent) |
+| 4. Combined | `langchain_version/main_combined.py` | Code picks the agent, the LLM picks the tools |
 
-## ✨ Features
+## Patterns used
 
-- **Intent Extraction:** Identifies the customer's query category using Gemini.
-- **Routing:** Selects the appropriate support agent based on intent.
-- **Tool Use:** Executes a Python function to check order status.
-- **Prompt Chaining:** Uses multiple AI prompts in sequence.
-- **Answer Generation:** Generates friendly and helpful customer responses.
-- **Reflection:** Reviews the generated answer for correctness and helpfulness.
-- **Error Handling:** Uses the original answer if the reflection step fails.
+- **Prompt chaining**: the output of one prompt feeds the next.
+- **Routing**: the request is sent to the right handler by intent.
+- **Tool use**: order status and refund are plain Python functions exposed as tools.
+- **Reflection**: a final prompt reviews and improves the answer.
 
-## 🧠 Architecture
+## How the combined version works
 
 ```mermaid
 flowchart TD
-    A[Customer Query] --> B[Intent Extraction]
-    B --> C[Routing]
-    C --> D{Select Agent}
-    D --> E[Order Agent]
-    D --> F[Refund Agent]
-    D --> G[Technical Agent]
-    D --> H[Purchase Agent]
-    D --> I[General Support Agent]
-
-    E --> J[Order Status Tool]
-    J --> K[Answer Generation]
-    F --> K
-    G --> K
-    H --> K
-    I --> K
-
-    K --> L[Reflection]
-    L --> M[Final Answer]
+    A["Customer query"] --> B["intent_chain (Gemini)"]
+    B --> C{"RunnableBranch"}
+    C -->|order| D["Order Agent<br/>tool: get_order_status"]
+    C -->|refund| E["Refund Agent<br/>tools: get_order_status, request_refund"]
+    C -->|technical| F["Technical Agent (no tools)"]
+    C -->|purchase| G["Purchase Agent (no tools)"]
+    C -->|other| H["General Agent (no tools)"]
+    D --> I["review_chain (reflection)"]
+    E --> I
+    F --> I
+    G --> I
+    H --> I
+    I --> J["Final answer"]
 ```
 
-## 🛠️ Technologies Used
+1. `intent_chain` asks Gemini for a one-word intent (`order_tracking`, `refund`, ...).
+2. `RunnableBranch` picks the agent from the intent.
+3. Agents with tools run a loop: Gemini asks for a tool, the code runs it, the result goes back to Gemini, until Gemini gives a final answer (maximum 5 rounds).
+4. `review_chain` reviews the answer and returns the improved version.
 
-- Python
-- Google Gemini API
-- Google GenAI SDK
-- python-dotenv
-- Regular Expressions
+Each agent only gets the tools it needs. The Order Agent cannot issue refunds because it has no refund tool.
 
-## 📂 Project Structure
+## Example
 
-```text
+Query: `Order 1234 late hai, refund do`
+
+1. Intent: `refund`
+2. Routed to: Refund Agent
+3. Gemini calls `get_order_status("1234")`, result `Shipped`
+4. Gemini calls `request_refund("1234")`, result `Refund not possible. Order status is Shipped.`
+5. Gemini explains this to the customer, then the reflection step polishes the reply.
+
+The exact tool order can vary, because the LLM decides it.
+
+## Project structure
+
+```
 smart-support-agent/
-│
-├── main.py
-├── requirements.txt
+├── main.py                      # original version (Gemini SDK)
+├── requirements.txt             # for main.py
 ├── README.md
-├── .env.example
 ├── .gitignore
-└── .env
+└── langchain_version/
+    ├── main_branch.py           # routing with RunnableBranch
+    ├── main_tools.py            # tool-calling agent
+    ├── main_combined.py         # routing + tools + reflection
+    └── requirements.txt         # for the LangChain versions
 ```
 
-## ⚙️ Installation
+## Setup
 
-### 1. Clone the Repository
+1. Clone the repo and go into the folder.
 
-```bash
-git clone https://github.com/asadchughtai08/smart-support-agent.git
-```
+   ```bash
+   git clone https://github.com/asadchughtai08/smart-support-agent.git
+   cd smart-support-agent
+   ```
 
-### 2. Navigate to the Project
+2. Create and activate a virtual environment.
 
-```bash
-cd smart-support-agent
-```
+   ```bash
+   python3 -m venv venv
+   source venv/bin/activate
+   ```
 
-### 3. Create a Virtual Environment
+3. Install the packages.
 
-```bash
-python -m venv venv
-```
+   ```bash
+   pip install -r langchain_version/requirements.txt
+   ```
 
-### 4. Activate the Virtual Environment
+   For the original `main.py` use `pip install -r requirements.txt` instead.
 
-Linux / Ubuntu:
+4. Create a `.env` file in the project root with your Gemini key.
 
-```bash
-source venv/bin/activate
-```
+   ```
+   GEMINI_API_KEY=your_key_here
+   ```
 
-### 5. Install Dependencies
+5. Run a version.
 
-```bash
-pip install -r requirements.txt
-```
+   ```bash
+   python langchain_version/main_combined.py
+   ```
 
-## 🔑 API Configuration
+## Try these queries
 
-Create a `.env` file in the project directory.
-
-Add your Gemini API key:
-
-```env
-GEMINI_API_KEY=your_api_key_here
-```
-
-Never upload your actual API key to GitHub.
-
-## ▶️ Usage
-
-Run the application:
-
-```bash
-python main.py
-```
-
-Enter a customer query when prompted.
-
-### Example
-
-**Input:**
-
-```text
-Where is my order 1234?
-```
-
-**Output:**
-
-```text
---- STEP 1: INTENT EXTRACTION ---
-Intent: order_tracking
-
---- STEP 2: ROUTING ---
-Selected Agent: Order Agent
-
---- STEP 3: TOOL RESULT ---
-Order Status: Shipped
-
---- STEP 4: FINAL ANSWER ---
-Hi there! I'd be happy to help.
-Your order #1234 has been shipped!
-
---- STEP 5: REFLECTION ---
-Your order #1234 has been shipped.
-```
-
-## 📚 Agentic AI Concepts Demonstrated
-
-| Concept | Description |
+| Query | What to look for |
 |---|---|
-| Prompt Chaining | Passing outputs from one prompt to another |
-| Intent Extraction | Understanding the customer's query |
-| Routing | Selecting the appropriate support agent |
-| Tool Use | Executing a Python function to retrieve order status |
-| Reflection | Reviewing and improving the generated response |
-| Exception Handling | Managing API errors without crashing the application |
+| `Where is order 1234?` | Order Agent calls `get_order_status` |
+| `Refund order 1236` | Refund Agent, order is Delivered so the refund is created |
+| `Order 1234 late hai, refund do` | Status check first, then the refund is rejected (Shipped) |
+| `My app is not working` | Technical Agent, no tool is called |
 
-## 🔮 Future Improvements
+## Workflow vs agent
 
-- Dynamic order ID extraction
-- Conversation memory
-- Improved error handling
-- More customer support tools
-- FastAPI backend
-- Web-based user interface
-- Database integration
+- **Workflow** (`main_branch.py`): the code decides the path. Predictable and cheap, good for fixed tasks.
+- **Agent** (`main_tools.py`): the LLM decides which tool to call and how many times. Flexible, but less predictable.
+- **Combined**: routing sets the boundaries and the LLM chooses tools inside them. It uses more LLM calls (about 4 to 5 per request) in exchange for safety and flexibility.
 
-## ⚠️ Disclaimer
+## Limitations
 
-This project is a learning-focused prototype.
+- Order data is a fake dictionary, not a database.
+- One wrong intent sends the request to the wrong agent.
+- LLM output is not deterministic, so results can differ between runs.
+- Only one agent handles a request, so a query that needs two departments is not split.
+- The model name (`gemini-3.5-flash-lite`) may differ for your account. Change it at the top of each file if you get a model error.
 
-Order information is stored in a local Python dictionary and is not connected to a real order management system.
+## Future improvements
 
-## 👨‍💻 Author
+- Move the agents to LangGraph for loops (retry after reflection), memory, and human approval before refunds.
+- Replace the dictionary with a real database.
+- Add automated tests for intents and tools.
+- Add logging and tracing.
 
-Asad Ullah Chughtai
+## Tech stack
 
-AI Engineer | Agentic AI & Generative AI
-
----
-
-⭐ If you find this project useful, feel free to star the repository!
+Python, LangChain, langchain-google-genai, Google Gemini, python-dotenv.

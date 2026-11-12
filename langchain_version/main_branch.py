@@ -22,7 +22,7 @@ load_dotenv()  # .env file ki API key load karo
 llm = ChatGoogleGenerativeAI(  # Gemini model bana rahe hain
     model="gemini-3.5-flash-lite",  # model ka naam
     google_api_key=os.getenv("GEMINI_API_KEY"),  # .env se API key lo
-    temperature=0,  # 0 rakha taake routing har baar same aaye
+    #temperature=0,  # 0 rakha taake routing har baar same aaye
 )
 
 # --------------------------------------------
@@ -40,7 +40,7 @@ def extract_order_id(query):  # query mein se 4 digit order ID nikalta hai
     if match:  # agar mil gaya
         return match.group()  # number wapas do
     else:  # agar nahi mila
-        return None  # None wapas do
+        return None  # None wapas do     
 
 
 def get_order_status(order_id):  # order ka status batata hai
