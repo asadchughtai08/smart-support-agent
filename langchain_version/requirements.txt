@@ -1,0 +1,9 @@
+# LangChain ka core (prompt, chain, parser yahan se aate hain)
+langchain
+langchain-core
+
+# LangChain ke liye Gemini model
+langchain-google-genai
+
+# .env file se API key parhne ke liye
+python-dotenv
