@@ -1,0 +1,12 @@
+# LangChain ka core (prompt, chain, parser yahan se aate hain)
+langchain
+langchain-core
+
+# LangChain ke liye Gemini model
+langchain-google-genai
+
+# MCP server se tools lene ke liye (mcp aur FastMCP sath aa jate hain)
+langchain-mcp-adapters
+
+# .env file se API key parhne ke liye
+python-dotenv
