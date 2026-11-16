@@ -1,77 +1,92 @@
 # Smart Support Agent
 
-A small customer support agent built with Python and Google Gemini.
-It reads a customer query, finds the intent, routes the request to the right agent, uses tools to get real order data, and reviews its own answer before replying.
+A customer support agent built step by step with Python, LangChain and Google Gemini.
+It reads a customer query, uses tools to get real order data, and answers the customer.
 
-The same idea is built **four ways**, so you can compare a plain workflow with a real tool-calling agent.
+The same idea is built in several ways, from a plain workflow up to a multi-agent system with tools served over MCP, so the differences are easy to see.
 
-## Versions
+## What it can do
 
-| Version | File | Who decides the path? |
-|---|---|---|
-| 1. Original (Gemini SDK) | `main.py` | Code (`if/elif` routing) |
-| 2. LangChain routing | `langchain_version/main_branch.py` | Code (`RunnableBranch`), fixed workflow |
-| 3. LangChain tools | `langchain_version/main_tools.py` | The LLM chooses tools itself (real agent) |
-| 4. Combined | `langchain_version/main_combined.py` | Code picks the agent, the LLM picks the tools |
+- Find the intent of a query and route it to the right agent.
+- Check order status and request refunds through tools.
+- Break a multi-step query into a plan and run it.
+- Use several specialist agents, each with only the tools it needs.
+- Load tools from a separate MCP server.
+- Review its own answer before replying.
+
+## Learning path
+
+| # | File | Pattern | Who decides the path |
+|---|---|---|---|
+| 1 | `main.py` | Prompt chaining, routing, tool use, reflection (Gemini SDK) | Code (`if/elif`) |
+| 2 | `langchain_version/main_branch.py` | Routing with `RunnableBranch` | Code |
+| 3 | `langchain_version/main_tools.py` | Tool-calling agent | The LLM chooses tools |
+| 4 | `langchain_version/main_combined.py` | Routing + tools + reflection | Code picks the agent, the LLM picks tools |
+| 5 | `langchain_version/main_plan_simple.py` | Planning | The LLM writes a plan, then steps run |
+| 6 | `langchain_version/main_planning.py` | Planning + routing + tools | Plan, then routing per step |
+| 7 | `langchain_version/main_multi_agent_plan.py` | Multi-agent, plan first | Supervisor writes a plan, code runs it |
+| 8 | `langchain_version/main_multi_agent_supervisor.py` | Multi-agent, agents as tools | Supervisor LLM calls agents itself |
+| 9 | `langchain_version/main_mcp_multi_agent.py` + `order_server.py` | Multi-agent with MCP | Same as 7, tools come from an MCP server |
+
+Each version has its own notes:
+
+- [Planning version](langchain_version/README_plan_simple.md)
+- [Multi-agent: plan vs supervisor](langchain_version/README_multi_agent.md)
+- [MCP version](langchain_version/README_mcp.md)
 
 ## Patterns used
 
 - **Prompt chaining**: the output of one prompt feeds the next.
-- **Routing**: the request is sent to the right handler by intent.
-- **Tool use**: order status and refund are plain Python functions exposed as tools.
-- **Reflection**: a final prompt reviews and improves the answer.
+- **Routing**: a request goes to the right handler by intent.
+- **Tool use**: order status and refund are plain functions exposed as tools.
+- **Reflection**: a reviewer improves the final answer.
+- **Planning**: the query is split into steps before anything runs.
+- **Multi-agent**: a supervisor works with specialist agents.
+- **MCP**: tools live in a separate server and are loaded by the agent.
 
-## How the combined version works
+## Workflow vs agent
+
+- **Workflow**: my code decides the path. Predictable and cheap, good for fixed tasks.
+- **Agent**: the LLM decides which tool to call and how many times. Flexible, but less predictable.
+- **Multi-agent**: a supervisor splits the work between specialist agents. Routing or a plan sets the boundaries, and each agent chooses its own tools inside them.
+
+## Latest architecture (version 9)
 
 ```mermaid
 flowchart TD
-    A["Customer query"] --> B["intent_chain (Gemini)"]
-    B --> C{"RunnableBranch"}
-    C -->|order| D["Order Agent<br/>tool: get_order_status"]
-    C -->|refund| E["Refund Agent<br/>tools: get_order_status, request_refund"]
-    C -->|technical| F["Technical Agent (no tools)"]
-    C -->|purchase| G["Purchase Agent (no tools)"]
-    C -->|other| H["General Agent (no tools)"]
-    D --> I["review_chain (reflection)"]
-    E --> I
-    F --> I
-    G --> I
-    H --> I
-    I --> J["Final answer"]
+    A["Customer query"] --> B["Supervisor writes a plan"]
+    B --> C["parse_plan: text becomes steps"]
+    C --> D["Order / Refund / General agents"]
+    D <-->|"MCP (stdio)"| E["order_server.py: get_order_status, request_refund"]
+    D --> F["Writer"]
+    F --> G["Reviewer"]
+    G --> H["Final answer"]
 ```
 
-1. `intent_chain` asks Gemini for a one-word intent (`order_tracking`, `refund`, ...).
-2. `RunnableBranch` picks the agent from the intent.
-3. Agents with tools run a loop: Gemini asks for a tool, the code runs it, the result goes back to Gemini, until Gemini gives a final answer (maximum 5 rounds).
-4. `review_chain` reviews the answer and returns the improved version.
-
-Each agent only gets the tools it needs. The Order Agent cannot issue refunds because it has no refund tool.
-
-## Example
-
-Query: `Order 1234 late hai, refund do`
-
-1. Intent: `refund`
-2. Routed to: Refund Agent
-3. Gemini calls `get_order_status("1234")`, result `Shipped`
-4. Gemini calls `request_refund("1234")`, result `Refund not possible. Order status is Shipped.`
-5. Gemini explains this to the customer, then the reflection step polishes the reply.
-
-The exact tool order can vary, because the LLM decides it.
+Each agent only has the tools it needs. The Order Agent cannot issue refunds because it has no refund tool, and the refund rules are enforced inside the tool code, not in a prompt.
 
 ## Project structure
 
 ```
 smart-support-agent/
-├── main.py                      # original version (Gemini SDK)
-├── requirements.txt             # for main.py
+├── main.py                           # original version (Gemini SDK)
+├── requirements.txt                  # for main.py
 ├── README.md
 ├── .gitignore
 └── langchain_version/
-    ├── main_branch.py           # routing with RunnableBranch
-    ├── main_tools.py            # tool-calling agent
-    ├── main_combined.py         # routing + tools + reflection
-    └── requirements.txt         # for the LangChain versions
+    ├── main_branch.py
+    ├── main_tools.py
+    ├── main_combined.py
+    ├── main_plan_simple.py
+    ├── main_planning.py
+    ├── main_multi_agent_plan.py
+    ├── main_multi_agent_supervisor.py
+    ├── main_mcp_multi_agent.py
+    ├── order_server.py               # MCP server
+    ├── requirements.txt              # for the LangChain versions
+    ├── README_plan_simple.md
+    ├── README_multi_agent.md
+    └── README_mcp.md
 ```
 
 ## Setup
@@ -107,39 +122,36 @@ smart-support-agent/
 5. Run a version.
 
    ```bash
-   python langchain_version/main_combined.py
+   python langchain_version/main_mcp_multi_agent.py
    ```
+
+   Replace the file name to run any other version.
 
 ## Try these queries
 
 | Query | What to look for |
 |---|---|
-| `Where is order 1234?` | Order Agent calls `get_order_status` |
-| `Refund order 1236` | Refund Agent, order is Delivered so the refund is created |
+| `Where is order 1234?` | Order status through a tool |
+| `Refund order 1236` | The order is Delivered, so the refund is created |
 | `Order 1234 late hai, refund do` | Status check first, then the refund is rejected (Shipped) |
-| `My app is not working` | Technical Agent, no tool is called |
-
-## Workflow vs agent
-
-- **Workflow** (`main_branch.py`): the code decides the path. Predictable and cheap, good for fixed tasks.
-- **Agent** (`main_tools.py`): the LLM decides which tool to call and how many times. Flexible, but less predictable.
-- **Combined**: routing sets the boundaries and the LLM chooses tools inside them. It uses more LLM calls (about 4 to 5 per request) in exchange for safety and flexibility.
+| `My app is not working` | A general answer, no tool |
 
 ## Limitations
 
 - Order data is a fake dictionary, not a database.
-- One wrong intent sends the request to the wrong agent.
+- One wrong intent or plan sends the work to the wrong place.
 - LLM output is not deterministic, so results can differ between runs.
-- Only one agent handles a request, so a query that needs two departments is not split.
+- More agents mean more LLM calls, so higher cost and latency.
 - The model name (`gemini-3.5-flash-lite`) may differ for your account. Change it at the top of each file if you get a model error.
 
 ## Future improvements
 
-- Move the agents to LangGraph for loops (retry after reflection), memory, and human approval before refunds.
-- Replace the dictionary with a real database.
-- Add automated tests for intents and tools.
+- Re-plan when a step fails, and validate plans before running them.
+- Move the agents to LangGraph for loops, memory and human approval before refunds.
+- Replace the dictionary with a real database behind the MCP server.
+- Add automated tests for intents, plans and tools.
 - Add logging and tracing.
 
 ## Tech stack
 
-Python, LangChain, langchain-google-genai, Google Gemini, python-dotenv.
+Python, LangChain, langchain-google-genai, langchain-mcp-adapters, MCP (FastMCP), Google Gemini, python-dotenv.
